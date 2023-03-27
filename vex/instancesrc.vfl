@@ -1,0 +1,185 @@
+//--------function----------
+//remap fit from 0 to 1 to new val
+function float remap01(float in, min, max, out)
+{
+    out = fit(in, 0, 1, min, max);
+    return(out);
+}
+
+//---------main--------------
+//set id
+int id;
+int chk = haspointattrib(geoself(), "id");
+if(chk != 1)
+{
+    id = i@ptnum;
+}
+else
+{
+    id = i@id;
+}
+
+//import caches
+//variables
+int enableproxy, numinputs, i;
+string cachelist[], proxylist[], taglist[], objidlist[];
+string cache, proxy, tag, sep, itmp;
+int objid;
+
+//body
+sep = "_";
+numinputs = chi("../inputs");
+enableproxy = chi("../enableProxy");
+
+for(i = 0; i <= numinputs; i++)
+{
+    itmp = sep + itoa(i);
+    
+    if(ch("../enableInstance") == 0)
+    {
+        cache = chs("../input_cache" + itmp);
+        proxy = chs("../input_proxy" + itmp);
+    }
+    else
+    {
+        cache = chs("../input_cachefile" + itmp);
+        proxy = chs("../input_proxyfile" + itmp);
+    }
+    
+    tag = chs("../input_tag" + itmp);
+    objid = chi("../objid" + itmp);
+    
+    append(cachelist[i], cache);
+    append(taglist[i], tag);
+    append(objidlist[i], itoa(objid));
+    
+    if(enableproxy == 1)
+    {
+        append(proxylist[i], proxy);
+    }
+}
+
+//methods:
+//variables
+float method = chi("method");
+float rand, randcache, pscale, startFrame, cachevar;
+vector rot;
+string idstr, tmp, cacheout, proxyout, tagout, objidout;
+int enable;
+
+//body
+if(method == 0)
+{
+    //random attribs method
+    rand = rand((id + 1) * (ch("seed")));
+    randcache = rand((id + 1) * (ch("variation")));
+    
+    //set variable values
+    remap01(rand, ch("min_pscale"), ch("max_pscale"), pscale);
+    remap01(rand, chi("min_startFrame"), chi("max_startFrame"), startFrame);
+    remap01(rand, ch("min_rot_y"), ch("max_rot_y"), rot.y);
+    
+    //cache/proxy list
+    remap01(randcache, 0, numinputs, cachevar);
+    cacheout = cachelist[int(cachevar)];
+    proxyout = proxylist[int(cachevar)];
+    tagout = taglist[int(cachevar)];
+    objidout = objidlist[int(cachevar)];
+}
+else if(method == 1)
+{
+    //defined attribs method
+    idstr = itoa(id);
+    tmp = sep + idstr;
+    
+    //set variable values
+    enable = chi("../enable" + tmp);
+    
+    if(enable == 1)
+    {
+        pscale = ch("../pscale" + tmp);
+        startFrame = ch("../startFrame" + tmp);
+        rot.y = ch("../rot_y" + tmp);
+        cachevar = ch("../bundle" + tmp);
+        cacheout = cachelist[int(cachevar)];
+        proxyout = proxylist[int(cachevar)];
+        tagout = taglist[int(cachevar)];
+        objidout = objidlist[int(cachevar)];
+    }
+    else
+    {
+        pscale = ch("../global_pscale");
+        startFrame = ch("../global_startFrame");
+        rot.y = ch("../rot_y");
+        cachevar = ch("../global_bundle");
+        cacheout = cachelist[int(cachevar)];
+        proxyout = proxylist[int(cachevar)];
+        tagout = taglist[int(cachevar)];
+        objidout = objidlist[int(cachevar)];
+    }
+}
+else if(method == 2)
+{
+
+}
+
+//set attribs
+@id = id;
+@pscale = pscale;
+i@startFrame = int(startFrame);
+i@offsetedFrame = @Frame - (i@startFrame - (ch("fstart")));
+@frameoffset = -(i@startFrame - (ch("fstart")));
+p@rot = set(0, radians(rot.y), 0, 1);
+s@tag = tagout;
+i@objid = atoi(objidout);
+i@index = i@objid;
+
+if(ch("../enableInstance") == 0)
+{
+    if(ch("../enableOperator") == 1)
+    {
+        s@cache = "op:" + cacheout;
+        s@proxy = "op:" + proxyout;
+    }
+    else
+    {
+        s@cache = cacheout;
+        s@proxy = proxyout;
+    }
+}
+else
+{
+    int globalPad = chi("../globalPadding");
+    string curFrame = sprintf("%0" + itoa(globalPad) + "d", @Frame);
+    string newFrame = sprintf("%0" + itoa(globalPad) + "d", i@offsetedFrame);
+    
+    i@padding = globalPad;
+    s@curframe = curFrame;
+    
+    s@inputcache = cacheout;
+    s@inputproxy = proxyout;
+    
+    s@cache = re_replace(curFrame, newFrame, cacheout);
+    s@proxy = re_replace(curFrame, newFrame, proxyout);
+}
+
+int instance, enablefilepath;
+
+if(chi("../enableInstance") == 1 || ch("../enableOperator") == 1)
+{
+    instance = 1;
+    enablefilepath = chi("../enableInstance");
+}
+
+setdetailattrib(geoself(), "instance", instance, "set");
+setdetailattrib(geoself(), "enablefilepath", enablefilepath, "set");
+
+
+//typecase
+if(chi("../type") == 2)
+{
+    if(i@enable != 1)
+    {
+        removepoint(0, @ptnum);
+    }
+}
